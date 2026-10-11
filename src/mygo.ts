@@ -128,6 +128,14 @@ export const Prefs = {
   openFullDiskAccess(): Promise<void> {
     return call("Prefs.OpenFullDiskAccess");
   },
+  /**
+   * PauseHotkey lifts the global hotkey while the settings page records a
+   * new one; otherwise pressing the current hotkey would toggle the window
+   * instead of reaching the page.
+   */
+  pauseHotkey(paused: boolean): Promise<void> {
+    return call("Prefs.PauseHotkey", paused);
+  },
   /** QSpace reports whether QSpace is installed and how it reveals files. */
   qSpace(): Promise<QSpace> {
     return call("Prefs.QSpace");

@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { CircleAlert, CircleCheck, Keyboard, Loader2 } from "lucide-react";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Switch } from "@/components/ui/switch";
@@ -6,8 +6,8 @@ import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Keys } from "@/components/keys";
 import { api, desktop, errorMessage, type QSpace, type Settings, type Status } from "@/lib/api";
-import { acceleratorFromEvent, hotkeyKeys } from "@/lib/hotkey";
-import { formatCount } from "@/lib/format";
+import { acceleratorFromEvent, heldModifiers, hotkeyKeys } from "@/lib/hotkey";
+import { formatCount, isMac, modKey } from "@/lib/format";
 import { cn } from "@/lib/utils";
 
 function Row({ title, hint, children }: { title: string; hint?: React.ReactNode; children: React.ReactNode }) {
@@ -24,35 +24,78 @@ function Row({ title, hint, children }: { title: string; hint?: React.ReactNode;
 
 function HotkeyRecorder({ value, onChange }: { value: string; onChange: (v: string) => void }) {
   const [recording, setRecording] = useState(false);
+  const [held, setHeld] = useState<string[]>([]);
+  const [hint, setHint] = useState<string | null>(null);
+  const ref = useRef<HTMLButtonElement>(null);
+  const onChangeRef = useRef(onChange);
+  onChangeRef.current = onChange;
+
+  // Keys are read from the window: WebKit does not focus a button that is
+  // clicked, so the button itself may never see them.
+  useEffect(() => {
+    if (!recording) return;
+    api.pauseHotkey(true);
+    const onKey = (e: KeyboardEvent) => {
+      e.preventDefault();
+      e.stopImmediatePropagation();
+      setHeld(heldModifiers(e));
+      if (e.type !== "keydown" || e.repeat) return;
+      if (e.key === "Escape" && !e.metaKey && !e.ctrlKey && !e.altKey && !e.shiftKey) {
+        setRecording(false);
+        return;
+      }
+      const acc = acceleratorFromEvent(e);
+      if (acc) {
+        onChangeRef.current(acc);
+        setRecording(false);
+      } else if (!["Meta", "Control", "Alt", "Shift", "CapsLock", "Fn"].includes(e.key)) {
+        setHint(`至少要带 ${modKey}、${isMac ? "⌃" : "Alt"} 或 ${isMac ? "⌥" : "Win"} 之一`);
+      }
+    };
+    const away = (e: PointerEvent) => {
+      if (!ref.current?.contains(e.target as Node)) setRecording(false);
+    };
+    window.addEventListener("keydown", onKey, true);
+    window.addEventListener("keyup", onKey, true);
+    window.addEventListener("pointerdown", away, true);
+    return () => {
+      window.removeEventListener("keydown", onKey, true);
+      window.removeEventListener("keyup", onKey, true);
+      window.removeEventListener("pointerdown", away, true);
+      api.pauseHotkey(false);
+      setHeld([]);
+      setHint(null);
+    };
+  }, [recording]);
+
   return (
-    <button
-      type="button"
-      onClick={() => setRecording(true)}
-      onBlur={() => setRecording(false)}
-      onKeyDown={(e) => {
-        if (!recording) return;
-        e.preventDefault();
-        e.stopPropagation();
-        if (e.key === "Escape") return setRecording(false);
-        const acc = acceleratorFromEvent(e);
-        if (acc) {
-          onChange(acc);
-          setRecording(false);
-        }
-      }}
-      className={cn(
-        "flex h-8 min-w-[148px] items-center justify-center gap-2 rounded-[8px] border px-3 text-[12px] transition-colors outline-none",
-        recording ? "border-foreground/25 bg-foreground/[0.06] text-foreground ring-3 ring-ring/40" : "border-border hover:bg-accent",
-      )}
-    >
-      {recording ? (
-        <span className="flex items-center gap-1.5 text-muted-foreground">
-          <Keyboard className="size-3.5" /> 按下新的组合键…
-        </span>
-      ) : (
-        <Keys keys={hotkeyKeys(value)} />
-      )}
-    </button>
+    <div className="flex flex-col items-end gap-1">
+      <button
+        ref={ref}
+        type="button"
+        onClick={(e) => {
+          e.currentTarget.focus();
+          setRecording((r) => !r);
+        }}
+        className={cn(
+          "flex h-8 min-w-[148px] items-center justify-center gap-2 rounded-[8px] border px-3 text-[12px] transition-colors outline-none",
+          recording ? "border-foreground/25 bg-foreground/[0.06] text-foreground ring-3 ring-ring/40" : "border-border hover:bg-accent",
+        )}
+      >
+        {!recording ? (
+          <Keys keys={hotkeyKeys(value)} />
+        ) : held.length > 0 ? (
+          <span className="flex items-center gap-1 text-muted-foreground">
+            <Keys keys={held} /> …
+          </span>
+        ) : (
+          <span className="flex items-center gap-1.5 text-muted-foreground">
+            <Keyboard className="size-3.5" /> 按下新的组合键…
+          </span>
+        )}
+      </button>
+      {recording && <span className={cn("text-[11px]", hint ? "text-warn" : "text-faint-foreground")}>{hint ?? "Esc 取消"}</span>}
+    </div>
   );
 }
 
@@ -125,7 +168,11 @@ function EngineStatus({ status }: { status: Status | null }) {
         <div className="flex items-start gap-2">
           <CircleAlert className="mt-[3px] size-3.5 shrink-0 text-warn" />
           <div className="min-w-0 flex-1">
-            <span>没有完全磁盘访问权限，“邮件”“信息”等受保护的文件夹不会被搜索。在列表中打开 Sift 后，按提示重新打开它即可。</span>
+            <span>
+              {status.message.startsWith("Sift 已获得")
+                ? status.message
+                : "没有完全磁盘访问权限，“邮件”“信息”等受保护的文件夹不会被搜索。在列表中打开 Sift 即可，Sift 会自动重建索引，不用重启。"}
+            </span>
             {desktop && (
               <Button variant="outline" size="sm" className="mt-2 h-7 text-[12px]" onClick={() => api.openFullDiskAccess()}>
                 打开“完全磁盘访问权限”

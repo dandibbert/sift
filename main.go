@@ -82,6 +82,24 @@ func (p Prefs) Save(s core.Settings) (core.Settings, error) {
 	return p.a.core.SaveSettings(s)
 }
 
+// PauseHotkey lifts the global hotkey while the settings page records a
+// new one; otherwise pressing the current hotkey would toggle the window
+// instead of reaching the page.
+func (p Prefs) PauseHotkey(paused bool) {
+	p.a.mu.Lock()
+	defer p.a.mu.Unlock()
+	if p.a.hotkey == "" {
+		return
+	}
+	if paused {
+		mygo.GlobalShortcut.Unregister(p.a.hotkey)
+	} else if !mygo.GlobalShortcut.IsRegistered(p.a.hotkey) {
+		if err := mygo.GlobalShortcut.Register(p.a.hotkey, p.a.toggle); err != nil {
+			log.Printf("sift: hotkey %s: %v", p.a.hotkey, err)
+		}
+	}
+}
+
 // QSpace reports whether QSpace is installed and how it reveals files.
 func (p Prefs) QSpace() handoff.QSpace { return p.a.core.QSpace() }
 
@@ -146,13 +164,13 @@ func (a *app) toggle() {
 func (a *app) registerHotkey(acc string) error {
 	a.mu.Lock()
 	defer a.mu.Unlock()
-	if acc == a.hotkey {
+	if acc == a.hotkey && mygo.GlobalShortcut.IsRegistered(acc) {
 		return nil
 	}
 	if err := mygo.GlobalShortcut.Register(acc, a.toggle); err != nil {
 		return err
 	}
-	if a.hotkey != "" {
+	if a.hotkey != "" && a.hotkey != acc {
 		mygo.GlobalShortcut.Unregister(a.hotkey)
 	}
 	a.hotkey = acc

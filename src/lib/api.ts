@@ -49,6 +49,10 @@ export const api = {
   qspace(): Promise<QSpace> {
     return desktop ? go.Prefs.qSpace() : http("qspace");
   },
+  /** Lifts the global hotkey while a new one is being recorded. */
+  pauseHotkey(paused: boolean): Promise<void> {
+    return desktop ? go.Prefs.pauseHotkey(paused) : Promise.resolve();
+  },
   openFullDiskAccess(): Promise<void> {
     return desktop ? go.Prefs.openFullDiskAccess() : Promise.resolve();
   },

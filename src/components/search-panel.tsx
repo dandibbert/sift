@@ -95,11 +95,16 @@ export function SearchPanel() {
   }, [refresh]);
 
   // Poll quickly while the index builds, slowly once it is up.
+  // Also quickly while settings wait for Full Disk Access to be granted.
+  const awaitingAccess = settingsOpen && status?.engine === "fsearch" && !status.fullDiskAccess;
   useEffect(() => {
-    const fast = !status || !status.ready;
+    if (settingsOpen) api.status().then(setStatus).catch(() => {});
+  }, [settingsOpen]);
+  useEffect(() => {
+    const fast = !status || !status.ready || awaitingAccess;
     const t = setInterval(() => api.status().then(setStatus).catch(() => {}), fast ? 1500 : 20000);
     return () => clearInterval(t);
-  }, [status?.ready]);
+  }, [status?.ready, awaitingAccess]);
 
   useEffect(() => setSelected(0), [result, searching, mode]);
 
