@@ -10,9 +10,9 @@ import { ModeSwitch, type SearchMode } from "@/components/mode-switch";
 import { ActionsMenu, RowContextMenu } from "@/components/actions-menu";
 import { StatusFooter } from "@/components/status-footer";
 import { SettingsDialog } from "@/components/settings-dialog";
-import { ContentIntro, NoResults, QueryError, SyntaxTips, Welcome } from "@/components/empty-states";
+import { IndexingNotice, NoResults, QueryError } from "@/components/empty-states";
 import { contentPattern, queryWords } from "@/lib/highlight";
-import { hotkeyKeys } from "@/lib/hotkey";
+import { useOverlay } from "@/lib/overlay";
 import { isMac } from "@/lib/format";
 import { cn } from "@/lib/utils";
 
@@ -35,6 +35,7 @@ export function SearchPanel() {
   const [selected, setSelected] = useState(0);
   const [actionsOpen, setActionsOpen] = useState(false);
   const [settingsOpen, setSettingsOpen] = useState(false);
+  const [contextOpen, setContextOpen] = useState(false);
   const [settings, setSettings] = useState<Settings | null>(null);
   const [status, setStatus] = useState<Status | null>(null);
   const [recents, setRecents] = useState<Hit[]>([]);
@@ -43,6 +44,9 @@ export function SearchPanel() {
   const listRef = useRef<HTMLDivElement>(null);
 
   const { result, loading, error } = useSearch(query, mode, filters);
+  useOverlay(actionsOpen);
+  useOverlay(contextOpen);
+  useOverlay(settingsOpen, "modal");
   const hasFilters = Boolean(filters.type || filters.kind || filters.modified || filters.size || filters.in);
   const searching = query.trim() !== "" || (mode === "name" && hasFilters);
   const hits = searching ? (result?.hits ?? []) : mode === "name" ? recents : [];
@@ -80,7 +84,14 @@ export function SearchPanel() {
         inputRef.current?.select();
       });
     });
-    return off;
+    const offSettings = api.onOpenSettings(() => {
+      setActionsOpen(false);
+      setSettingsOpen(true);
+    });
+    return () => {
+      off();
+      offSettings();
+    };
   }, [refresh]);
 
   // Poll quickly while the index builds, slowly once it is up.
@@ -174,14 +185,11 @@ export function SearchPanel() {
   const listLabel = !searching && mode === "name" && recents.length > 0 ? "最近使用" : null;
   const showProgress = loading;
 
-  const pickTip = (q: string) => {
-    setMode("name");
-    setQuery(q);
-    focusInput();
-  };
-
-  let body: React.ReactNode;
-  if (error && hits.length === 0) {
+  // Nothing to list: the window is just the search field and the filters.
+  let body: React.ReactNode = null;
+  if (searching && result?.indexing && hits.length === 0) {
+    body = <IndexingNotice text={result.notice} />;
+  } else if (error && hits.length === 0) {
     body = <QueryError message={error} />;
   } else if (searching && result && hits.length === 0 && !loading) {
     body = (
@@ -199,21 +207,7 @@ export function SearchPanel() {
         }}
       />
     );
-  } else if (!searching) {
-    body =
-      mode === "content" ? (
-        <>
-          <ContentIntro />
-          <SyntaxTips onPick={pickTip} />
-        </>
-      ) : (
-        <>
-          {recents.length === 0 && <Welcome hotkey={hotkeyKeys(settings?.hotkey ?? "CmdOrCtrl+Shift+Space").join("+")} />}
-          {recents.length > 0 && renderList()}
-          <SyntaxTips onPick={pickTip} />
-        </>
-      );
-  } else {
+  } else if (hits.length > 0 || (searching && error)) {
     body = (
       <>
         {error && <QueryError message={error} />}
@@ -224,7 +218,12 @@ export function SearchPanel() {
 
   function renderList() {
     return (
-      <ContextMenu onOpenChange={(o) => !o && focusInput()}>
+      <ContextMenu
+        onOpenChange={(o) => {
+          setContextOpen(o);
+          if (!o) focusInput();
+        }}
+      >
         <ContextMenuTrigger asChild>
           <div role="listbox" aria-label={listLabel ?? "搜索结果"} className="pb-2">
             {listLabel && (
@@ -261,7 +260,7 @@ export function SearchPanel() {
   }
 
   return (
-    <div onKeyDown={onKeyDown} className="@container relative flex h-full flex-col overflow-hidden">
+    <div onKeyDown={onKeyDown} className="@container relative flex min-h-0 grow flex-col overflow-hidden">
       <header className="flex h-[58px] shrink-0 items-center gap-3 pr-3 pl-[18px]" style={{ "--app-region": "drag" } as React.CSSProperties}>
         <SearchIcon className="size-[19px] shrink-0 text-muted-foreground" strokeWidth={1.9} />
         <input
@@ -299,7 +298,7 @@ export function SearchPanel() {
         }}
       />
 
-      <div className="relative h-px shrink-0 bg-border">
+      <div className={cn("relative h-px shrink-0", body ? "bg-border" : "-mt-px")}>
         {showProgress && (
           <div className="absolute inset-0 overflow-hidden">
             <div className="animate-progress h-full w-1/3 bg-gradient-to-r from-transparent via-foreground/50 to-transparent" />
@@ -307,11 +306,14 @@ export function SearchPanel() {
         )}
       </div>
 
-      <div ref={listRef} className={cn("min-h-0 flex-1 overflow-y-auto pt-2 scrollbar-quiet", loading && "opacity-90")}>
-        {body}
-      </div>
+      {body && (
+        <div ref={listRef} className={cn("min-h-0 shrink grow overflow-y-auto pt-2 scrollbar-quiet", loading && "opacity-90")}>
+          {body}
+        </div>
+      )}
+      {!body && settingsOpen && <div className="grow" />}
 
-      <StatusFooter
+      {body && <StatusFooter
         status={status}
         result={searching ? result : null}
         count={hits.length}
@@ -324,10 +326,10 @@ export function SearchPanel() {
             {node}
           </ActionsMenu>
         )}
-      />
+      />}
 
       {toast && (
-        <div key={toast.id} className="pointer-events-none absolute inset-x-0 bottom-[52px] flex justify-center px-6">
+        <div key={toast.id} className={cn("pointer-events-none absolute inset-x-0 flex justify-center px-6", body ? "bottom-[52px]" : "bottom-2")}>
           <div
             role="status"
             className={cn(
@@ -347,10 +349,7 @@ export function SearchPanel() {
           if (!o) focusInput();
         }}
         status={status}
-        onSaved={(s) => {
-          setSettings(s);
-          showToast("设置已保存");
-        }}
+        onSaved={setSettings}
       />
     </div>
   );

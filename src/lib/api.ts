@@ -49,12 +49,23 @@ export const api = {
   qspace(): Promise<QSpace> {
     return desktop ? go.Prefs.qSpace() : http("qspace");
   },
+  openFullDiskAccess(): Promise<void> {
+    return desktop ? go.Prefs.openFullDiskAccess() : Promise.resolve();
+  },
   hide(): Promise<void> {
     return desktop ? go.Panel.hide() : Promise.resolve();
+  },
+  /** Fits the desktop window to the panel; the browser preview has no window. */
+  resize(height: number): Promise<void> {
+    return desktop ? go.Panel.resize(Math.ceil(height)) : Promise.resolve();
   },
   onShown(fn: () => void): () => void {
     if (!desktop) return () => {};
     return go.events.shown.on(fn);
+  },
+  onOpenSettings(fn: () => void): () => void {
+    if (!desktop) return () => {};
+    return go.events.openSettings.on(fn);
   },
 };
 

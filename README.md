@@ -11,15 +11,18 @@ Sift 只做搜索，不做文件浏览：它不替代 Finder 或 QSpace，也不
    - 双击 Sift，看到提示后点“完成”，再到“系统设置 › 隐私与安全性”里点“仍要打开”；或者
    - 在终端运行 `xattr -dr com.apple.quarantine /Applications/Sift.app`
 3. 按 `⌘⇧Space` 唤起。Sift 常驻在菜单栏，不占 Dock。
+4. 可选：在 Sift 的设置（`⌘,`）里点“打开‘完全磁盘访问权限’”并打开 Sift，受保护的文件夹（邮件、信息等）也能搜到。
+
+fsearch 已经打包在 `Sift.app/Contents/MacOS/fsearch` 里，不需要另外安装。第一次启动时它会为整块磁盘建立索引（约半分钟），之后通过 FSEvents 增量更新。
 
 支持 macOS 12 及以上，同一个包包含 Apple Silicon 和 Intel 两种架构。
 
-重新出包：`scripts/package-macos.sh`，产物在 `build/release/`。在 Linux 上打包需要 [rcodesign](https://github.com/indygreg/apple-platform-rs) 和 `genisoimage`。要彻底去掉首次打开的拦截，需要 Apple Developer ID 签名并公证，在 `mygo.config.ts` 的 `macos.signingIdentity` 和 `macos.notarize` 中配置后，在 Mac 上运行 `bun run build`。
+重新出包：`scripts/package-macos.sh`，产物在 `build/release/`。它会先用 `scripts/build-fsearch.sh` 编译固定版本的 fsearch（需要 Rust），合成通用二进制放进 app 再签名。在 Linux 上打包还需要 [cargo-zigbuild](https://github.com/rust-cross/cargo-zigbuild) + `pip install ziglang`（交叉编译 fsearch）、[rcodesign](https://github.com/indygreg/apple-platform-rs) 和 `genisoimage`。要彻底去掉首次打开的拦截，需要 Apple Developer ID 签名并公证，在 `mygo.config.ts` 的 `macos.signingIdentity` 和 `macos.notarize` 中配置后，在 Mac 上运行 `bun run build`。
 
 ## 功能
 
 - **全局快捷键唤起**：默认 `⌘⇧Space`，在任何应用里（包括 QSpace）都能用，可在设置中修改。失去焦点自动收起，常驻菜单栏，不占 Dock。
-- **fsearch 引擎**：通过 Unix socket 长连接 fsearch 守护进程（`~/Library/Application Support/FSearch/fsearch.sock`），守护进程没在运行时会自动执行 `fsearch serve` 拉起。
+- **内置 fsearch 引擎**：通过 Unix socket 长连接 fsearch 守护进程（`~/Library/Application Support/FSearch/fsearch.sock`）。守护进程没在运行时，Sift 用 app 里自带的 fsearch 执行 `fsearch serve` 拉起它，退出 Sift 时一并停止；如果你自己装了 fsearch 并让它随登录启动，Sift 直接连接，不会去停它。
   - 模糊匹配，5 个字母以上的词容忍一处错字（`mian.rs` 能找到 `main.rs`）
   - `'精确`、`^前缀`、`后缀$`、`!排除`
   - 过滤器：`ext:` `type:` `kind:` `in:` `size:` `mtime:` `re:` `path:` `limit:`
@@ -39,8 +42,9 @@ Sift 只做搜索，不做文件浏览：它不替代 Finder 或 QSpace，也不
   | 全部操作 | `⌘K`，或在结果上右键 |
 
   回车键的默认行为可以在设置（`⌘,`）里改成“直接打开”。
+- **安静的入口**：空白时窗口只有搜索框和过滤条，窗口高度随内容伸缩；有最近使用的项目时列在下面。搜索写法的说明放在设置里。
 - **最近使用**：交给 QSpace 或打开过的项目会出现在空白搜索页上。
-- **没装 fsearch 也能用**：会降级到内置索引（扫描主目录，语法相同，速度慢得多），状态栏会显示黄色提示，装好 fsearch 后自动切换。
+- **兜底**：万一 fsearch 起不来，会降级到 Go 写的内置索引（扫描主目录，语法相同，速度慢得多），并在后台重试 fsearch。
 
 ### 关于“在 QSpace 中显示”
 
@@ -69,15 +73,7 @@ src/                    搜索窗口的页面
 bun install
 ```
 
-### 安装 fsearch（推荐）
-
-```sh
-git clone https://github.com/noahdunnagan/fsearch
-cd fsearch && cargo build --release
-./target/release/fsearch install --login   # 安装到 ~/.local/bin，并随登录启动守护进程
-```
-
-在“系统设置 › 隐私与安全性 › 完全磁盘访问权限”里给 `~/.local/bin/fsearch` 授权，否则受保护的文件夹不会被索引。
+开发模式下没有 app 包，Sift 会在 `PATH`、`~/.local/bin`、Homebrew 目录里找 fsearch；`scripts/build-fsearch.sh` 编出来的在 `build/fsearch/fsearch`，可以用 `SIFT_FSEARCH_BIN` 指过去。
 
 ### 桌面应用
 
@@ -114,5 +110,5 @@ bun run typecheck
 | 环境变量 | 作用 |
 |---|---|
 | `SIFT_FSEARCH_SOCKET` | 指定 fsearch 的 socket 路径 |
-| `SIFT_FSEARCH_BIN` | 指定 fsearch 可执行文件 |
+| `SIFT_FSEARCH_BIN` | 指定 fsearch 可执行文件（默认用 app 里自带的） |
 | `SIFT_PREVIEW_PORT` | 浏览器预览 API 的端口（默认 47219） |

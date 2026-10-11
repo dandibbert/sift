@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import { Search } from "lucide-react";
 import { Keys } from "@/components/keys";
+import { PanelFrame, PANEL_MAX } from "@/components/panel-frame";
 
 /**
  * The browser preview's stand-in for the Mac desktop: a menu bar and a
@@ -78,9 +79,12 @@ export function PreviewDesktop({ children }: { children: React.ReactNode }) {
       <div aria-hidden className="absolute inset-0 bg-black/10 dark:bg-black/25" />
 
       <div className="relative z-10 flex flex-col items-center px-3 pt-[9vh] sm:pt-[14vh]">
-        <div className="animate-panel-in h-[min(540px,calc(100dvh-140px))] w-full max-w-[760px] overflow-hidden rounded-[16px] border border-[var(--panel-edge)] bg-panel shadow-[var(--shadow-panel)] backdrop-blur-2xl backdrop-saturate-150">
+        <PanelFrame
+          maxHeight={`min(${PANEL_MAX}px, calc(100dvh - 140px))`}
+          className="animate-panel-in w-full max-w-[760px] rounded-[16px] border border-[var(--panel-edge)] bg-panel shadow-[var(--shadow-panel)] backdrop-blur-2xl backdrop-saturate-150"
+        >
           {children}
-        </div>
+        </PanelFrame>
         <p className="mt-4 flex items-center gap-1.5 text-[11.5px] text-black/55 dark:text-white/45">
           浏览器预览 · 桌面版里这是按 <Keys keys={["⌘", "⇧", "Space"]} className="opacity-80" /> 唤起的浮动窗口
         </p>

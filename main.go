@@ -16,13 +16,17 @@ import (
 )
 
 const (
-	panelWidth  = 760
-	panelHeight = 540
+	panelWidth     = 760
+	panelHeight    = 540
+	minPanelHeight = 64
 )
 
 // Shown is sent to the page each time the hotkey brings the window up, so
 // that it selects the query and refreshes the engine status.
 var Shown = mygo.NewEvent[bool]("shown")
+
+// OpenSettings asks the page to open its settings dialog.
+var OpenSettings = mygo.NewEvent[bool]("open-settings")
 
 type app struct {
 	core *core.Core
@@ -81,11 +85,31 @@ func (p Prefs) Save(s core.Settings) (core.Settings, error) {
 // QSpace reports whether QSpace is installed and how it reveals files.
 func (p Prefs) QSpace() handoff.QSpace { return p.a.core.QSpace() }
 
+// OpenFullDiskAccess shows the System Settings pane where Sift is allowed
+// to read protected folders. The daemon is Sift's child, so the one grant
+// covers it.
+func (p Prefs) OpenFullDiskAccess() error {
+	p.a.hide()
+	return handoff.OpenFullDiskAccess()
+}
+
 // Panel controls the search window.
 type Panel struct{ a *app }
 
 // Hide puts the window away, giving the focus back to the previous app.
 func (p Panel) Hide() { p.a.hide() }
+
+// Resize fits the window to the panel's height, so that an empty search
+// is just the search field. The top edge stays where it is.
+func (p Panel) Resize(height int) {
+	if p.a.win == nil {
+		return
+	}
+	height = max(minPanelHeight, min(panelHeight, height))
+	if _, h := p.a.win.Size(); h != height {
+		p.a.win.SetSize(panelWidth, height)
+	}
+}
 
 func (a *app) hide() {
 	if a.win == nil || !a.win.IsVisible() {
@@ -198,11 +222,20 @@ func main() {
 			ToolTip:        "Sift",
 			Menu: mygo.NewMenu([]*mygo.MenuItem{
 				{Label: "打开搜索", Accelerator: a.core.Settings().Hotkey, Click: func(*mygo.MenuItem, *mygo.Window) { a.show() }},
+				{Label: "设置…", Click: func(*mygo.MenuItem, *mygo.Window) {
+					a.show()
+					OpenSettings.Emit(a.win, true)
+				}},
 				mygo.Separator(),
 				{Label: "退出 Sift", Click: func(*mygo.MenuItem, *mygo.Window) { mygo.App.Quit() }},
 			}),
 		}); err != nil {
 			log.Printf("sift: tray: %v", err)
+		}
+	})
+	mygo.App.OnWillQuit(func(*mygo.QuitEvent) {
+		if a.core != nil {
+			a.core.Engine.Close()
 		}
 	})
 	mygo.App.OnSecondInstance(func([]string, string) { a.show() })

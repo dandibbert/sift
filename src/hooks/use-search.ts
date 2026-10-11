@@ -21,7 +21,17 @@ function hasFilters(f: Filters) {
  */
 export function useSearch(query: string, mode: "name" | "content", filters: Filters): SearchState {
   const [state, setState] = useState<SearchState>({ result: null, loading: false, error: null });
+  const [retry, setRetry] = useState(0);
   const seq = useRef(0);
+
+  // While the first index builds every answer is empty: ask again until it
+  // is ready, so the results appear without retyping.
+  const indexing = state.result?.indexing ?? false;
+  useEffect(() => {
+    if (!indexing) return;
+    const t = setTimeout(() => setRetry((n) => n + 1), 1500);
+    return () => clearTimeout(t);
+  }, [indexing, state.result]);
 
   useEffect(() => {
     const id = ++seq.current;
@@ -50,7 +60,7 @@ export function useSearch(query: string, mode: "name" | "content", filters: Filt
       clearTimeout(run);
       clearTimeout(slow);
     };
-  }, [query, mode, filters]);
+  }, [query, mode, filters, retry]);
 
   return state;
 }

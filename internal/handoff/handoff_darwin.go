@@ -91,3 +91,9 @@ func FrontmostApp() string {
 	_, id, _ := strings.Cut(strings.TrimSpace(string(out)), "=")
 	return strings.Trim(id, `"`)
 }
+
+// OpenFullDiskAccess opens System Settings at Privacy & Security › Full
+// Disk Access, where Sift can be allowed to index protected folders.
+func OpenFullDiskAccess() error {
+	return exec.Command("open", "x-apple.systempreferences:com.apple.preference.security?Privacy_AllFiles").Run()
+}

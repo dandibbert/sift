@@ -57,6 +57,8 @@ export interface Result {
   engine: string;
   mode: Mode;
   partial: boolean;
+  indexing: boolean;
+  notice: string;
 }
 
 export interface Settings {
@@ -118,6 +120,14 @@ export const Prefs = {
   get(): Promise<Settings> {
     return call("Prefs.Get");
   },
+  /**
+   * OpenFullDiskAccess shows the System Settings pane where Sift is allowed
+   * to read protected folders. The daemon is Sift's child, so the one grant
+   * covers it.
+   */
+  openFullDiskAccess(): Promise<void> {
+    return call("Prefs.OpenFullDiskAccess");
+  },
   /** QSpace reports whether QSpace is installed and how it reveals files. */
   qSpace(): Promise<QSpace> {
     return call("Prefs.QSpace");
@@ -134,6 +144,13 @@ export const Panel = {
   hide(): Promise<void> {
     return call("Panel.Hide");
   },
+  /**
+   * Resize fits the window to the panel's height, so that an empty search
+   * is just the search field. The top edge stays where it is.
+   */
+  resize(height: number): Promise<void> {
+    return call("Panel.Resize", height);
+  },
 } as const;
 
 // ---- Events ----
@@ -145,4 +162,6 @@ export const events = {
    * that it selects the query and refreshes the engine status.
    */
   shown: event<boolean>("shown"),
+  /** OpenSettings asks the page to open its settings dialog. */
+  openSettings: event<boolean>("open-settings"),
 } as const;

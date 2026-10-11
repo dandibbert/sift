@@ -45,3 +45,6 @@ func openWith(path string) error {
 		return exec.Command("xdg-open", path).Start()
 	}
 }
+
+// OpenFullDiskAccess only means something on macOS.
+func OpenFullDiskAccess() error { return errors.New("完全磁盘访问权限仅适用于 macOS") }

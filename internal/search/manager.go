@@ -92,5 +92,6 @@ func (m *Manager) Close() error {
 	if m.builtin != nil {
 		m.builtin.Close()
 	}
+	StopDaemons()
 	return nil
 }

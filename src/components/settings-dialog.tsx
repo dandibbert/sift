@@ -73,6 +73,71 @@ function Segmented<T extends string>({ value, options, onChange }: { value: T; o
   );
 }
 
+const syntax: Array<[string, string]> = [
+  ["mian.rs", "容错匹配，打错一个字母也能找到 main.rs"],
+  ["ext:pdf 合同", "按扩展名"],
+  ["type:image mtime:<7d", "类型：image video audio doc code archive app"],
+  ["size:>1gb", "按大小，单位 kb mb gb"],
+  ["in:~/Developer", "只在某个文件夹里找"],
+  ["^IMG_ !heic", "^ 开头，$ 结尾，! 排除"],
+  ["grep:TODO ext:md", "在文件内容里找，Tab 切换到内容模式也可以"],
+];
+
+function EngineStatus({ status }: { status: Status | null }) {
+  const box = "mt-2 flex items-start gap-2 rounded-[10px] border border-border bg-foreground/[0.02] p-3 text-[12px] leading-5 text-muted-foreground";
+  if (!status) {
+    return (
+      <div className={box}>
+        <Loader2 className="mt-[3px] size-3.5 shrink-0 animate-spin" /> 正在连接…
+      </div>
+    );
+  }
+  if (status.engine !== "fsearch") {
+    return (
+      <div className={box}>
+        <CircleAlert className="mt-[3px] size-3.5 shrink-0 text-warn" />
+        <span>
+          {desktop
+            ? `${status.message || "fsearch 没能启动"}。暂时使用内置索引，只覆盖个人文件夹，Sift 会在后台自动重试。`
+            : "浏览器预览使用内置索引搜索示例文件夹；桌面版自带 fsearch，索引整块磁盘。"}
+        </span>
+      </div>
+    );
+  }
+  if (!status.ready) {
+    return (
+      <div className={box}>
+        <Loader2 className="mt-[3px] size-3.5 shrink-0 animate-spin" />
+        <span>{status.message || "正在建立索引…"}</span>
+      </div>
+    );
+  }
+  return (
+    <div className={cn(box, "flex-col gap-2")}>
+      <div className="flex items-start gap-2">
+        <CircleCheck className="mt-[3px] size-3.5 shrink-0 text-ok" />
+        <span>
+          fsearch 已索引 <span className="tabular text-foreground">{formatCount(status.entries)}</span> 个项目，通过 FSEvents 实时更新
+          {status.fullDiskAccess && status.message ? `。${status.message}` : ""}
+        </span>
+      </div>
+      {!status.fullDiskAccess && (
+        <div className="flex items-start gap-2">
+          <CircleAlert className="mt-[3px] size-3.5 shrink-0 text-warn" />
+          <div className="min-w-0 flex-1">
+            <span>没有完全磁盘访问权限，“邮件”“信息”等受保护的文件夹不会被搜索。在列表中打开 Sift 后，按提示重新打开它即可。</span>
+            {desktop && (
+              <Button variant="outline" size="sm" className="mt-2 h-7 text-[12px]" onClick={() => api.openFullDiskAccess()}>
+                打开“完全磁盘访问权限”
+              </Button>
+            )}
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
 export function SettingsDialog({ open, onOpenChange, status, onSaved }: { open: boolean; onOpenChange: (o: boolean) => void; status: Status | null; onSaved: (s: Settings) => void }) {
   const [draft, setDraft] = useState<Settings | null>(null);
   const [qspace, setQSpace] = useState<QSpace | null>(null);
@@ -100,8 +165,6 @@ export function SettingsDialog({ open, onOpenChange, status, onSaved }: { open: 
       setSaving(false);
     }
   };
-
-  const fsearch = status?.engine === "fsearch";
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
@@ -172,31 +235,20 @@ export function SettingsDialog({ open, onOpenChange, status, onSaved }: { open: 
             </div>
             <div className="py-3">
               <div className="text-[13px] font-medium text-foreground">搜索引擎</div>
-              <div className="mt-2 rounded-[10px] border border-border bg-foreground/[0.02] p-3 text-[12px] leading-5 text-muted-foreground">
-                {fsearch ? (
-                  <div className="flex items-start gap-2">
-                    <CircleCheck className="mt-[3px] size-3.5 shrink-0 text-ok" />
-                    <span>
-                      已连接 fsearch，索引了 <span className="tabular text-foreground">{formatCount(status?.entries ?? 0)}</span> 个项目
-                      {status?.message ? `。${status.message}` : "，通过 FSEvents 实时更新。"}
-                    </span>
+              <EngineStatus status={status} />
+            </div>
+            <div className="py-3">
+              <div className="text-[13px] font-medium text-foreground">搜索写法</div>
+              <dl className="mt-2 grid grid-cols-[auto_1fr] gap-x-4 gap-y-1.5 text-[12px] leading-5">
+                {syntax.map(([q, text]) => (
+                  <div key={q} className="contents">
+                    <dt>
+                      <code className="font-mono text-[11.5px] text-foreground/90">{q}</code>
+                    </dt>
+                    <dd className="text-muted-foreground">{text}</dd>
                   </div>
-                ) : (
-                  <div className="flex items-start gap-2">
-                    <CircleAlert className="mt-[3px] size-3.5 shrink-0 text-warn" />
-                    <span>
-                      {status?.message || "未连接 fsearch"}。安装后会自动切换：
-                      <code className="mt-1.5 block rounded-md bg-foreground/[0.05] px-2 py-1.5 font-mono text-[11px] text-foreground/85">
-                        git clone https://github.com/noahdunnagan/fsearch
-                        <br />
-                        cd fsearch && cargo build --release
-                        <br />
-                        ./target/release/fsearch install --login
-                      </code>
-                    </span>
-                  </div>
-                )}
-              </div>
+                ))}
+              </dl>
             </div>
           </div>
         )}

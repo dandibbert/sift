@@ -65,6 +65,10 @@ type Result struct {
 	// Partial is set when a content search ran out of its time budget or
 	// the content index is still being built.
 	Partial bool `json:"partial"`
+	// Indexing is set while the first index builds and nothing can be
+	// searched yet; Notice says how far along it is.
+	Indexing bool   `json:"indexing"`
+	Notice   string `json:"notice"`
 }
 
 // Status describes the engine behind the search window.

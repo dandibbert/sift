@@ -10,7 +10,9 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"regexp"
 	"runtime"
+	"strconv"
 	"strings"
 	"sync"
 	"time"
@@ -29,11 +31,20 @@ func DefaultSocket() string {
 	return filepath.Join(home, "Library", "Application Support", "FSearch", "fsearch.sock")
 }
 
-// FindBinary looks for the fsearch CLI where `fsearch install` and package
-// managers put it.
+// FindBinary looks for fsearch next to the Sift executable, where the app
+// bundle carries it, then where `fsearch install` and package managers put
+// it.
 func FindBinary() string {
 	if b := os.Getenv("SIFT_FSEARCH_BIN"); b != "" {
 		return b
+	}
+	if exe, err := os.Executable(); err == nil {
+		if exe, err = filepath.EvalSymlinks(exe); err == nil {
+			p := filepath.Join(filepath.Dir(exe), "fsearch")
+			if st, err := os.Stat(p); err == nil && !st.IsDir() && p != exe {
+				return p
+			}
+		}
 	}
 	if p, err := exec.LookPath("fsearch"); err == nil {
 		return p
@@ -208,6 +219,9 @@ func (f *Fsearch) Search(ctx context.Context, req Request) (Result, error) {
 	}
 	var a fsAnswer
 	if err := f.call(ctx, msg, &a); err != nil {
+		if n, ok := indexingProgress(err); ok {
+			return Result{Engine: "fsearch", Mode: mode, Hits: []Hit{}, Indexing: true, Notice: indexingNotice(n)}, nil
+		}
 		return Result{}, err
 	}
 	res := Result{Engine: "fsearch", Mode: mode, TookUs: a.TookUs, Hits: make([]Hit, 0, len(a.Hits)+len(a.Files))}
@@ -257,16 +271,40 @@ func (f *Fsearch) Status(ctx context.Context) Status {
 	}
 	st := Status{Engine: "fsearch"}
 	if err := f.call(ctx, map[string]any{"op": "status"}, &s); err != nil {
-		st.Message = err.Error()
+		if n, ok := indexingProgress(err); ok {
+			st.Entries, st.FullDiskAccess, st.Message = n, true, indexingNotice(n)
+		} else {
+			st.Message = err.Error()
+		}
 		return st
 	}
 	st.Ready, st.Entries, st.FullDiskAccess = true, s.Entries, s.FullDiskAccess
 	if !s.FullDiskAccess {
-		st.Message = "fsearch 没有完全磁盘访问权限，受保护的文件夹不会被索引"
+		st.Message = "Sift 没有完全磁盘访问权限，“邮件”“信息”等受保护的文件夹不会被搜索"
 	} else if s.ContentPending > 0 {
 		st.Message = fmt.Sprintf("内容索引中，剩余 %d 个文件", s.ContentPending)
 	}
 	return st
+}
+
+var indexingRe = regexp.MustCompile(`^indexing: ([0-9.]+)M entries`)
+
+// indexingProgress recognizes the answer fsearch gives to every query
+// while its first index builds, and returns how many entries it has listed.
+func indexingProgress(err error) (int, bool) {
+	m := indexingRe.FindStringSubmatch(err.Error())
+	if m == nil {
+		return 0, false
+	}
+	millions, _ := strconv.ParseFloat(m[1], 64)
+	return int(millions * 1e6), true
+}
+
+func indexingNotice(entries int) string {
+	if entries < 50_000 {
+		return "正在建立索引，第一次启动需要半分钟左右"
+	}
+	return fmt.Sprintf("正在建立索引，已扫描 %.1f 万项，第一次启动需要半分钟左右", float64(entries)/1e4)
 }
 
 func (f *Fsearch) Close() error {

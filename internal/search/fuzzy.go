@@ -128,8 +128,17 @@ func oneTypo(name, t string) bool {
 			}
 		}
 	}
-	for i := range r {
-		if subsequence(name, string(r[:i])+string(r[i+1:])) > 0 && len(r) > 5 {
+	n := []rune(name)
+	for start := 0; start+len(r) <= len(n); start++ {
+		diff := 0
+		for i, c := range r {
+			if n[start+i] != c {
+				if diff++; diff > 1 {
+					break
+				}
+			}
+		}
+		if diff <= 1 {
 			return true
 		}
 	}

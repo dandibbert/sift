@@ -2,8 +2,10 @@ package search
 
 import (
 	"context"
+	"errors"
 	"os"
 	"path/filepath"
+	"strings"
 	"testing"
 	"time"
 )
@@ -22,6 +24,8 @@ func TestWordScore(t *testing.T) {
 		{"'exact", "inexactly", true},
 		{"pdf", "kyoto-trip-edit-final.mp4", false},
 		{"季度", "2026 q3 季度报告.pdf", true},
+		{"report", "figma-export-icons.zip", false},
+		{"repart", "q3-report.pdf", true}, // one wrong letter
 	}
 	for _, c := range cases {
 		got := parseWord(c.word).score(c.name) > 0
@@ -96,5 +100,18 @@ func TestBuiltin(t *testing.T) {
 	res, _ = b.Search(ctx, Request{Query: "Quarterly", Mode: ModeContent})
 	if len(res.Hits) != 0 {
 		t.Fatalf("smart case should not match: %+v", res.Hits)
+	}
+}
+
+func TestIndexingProgress(t *testing.T) {
+	n, ok := indexingProgress(errors.New("indexing: 1.2M entries so far (the first run lists the whole disk, ~25s)"))
+	if !ok || n != 1_200_000 {
+		t.Fatalf("got %d %v", n, ok)
+	}
+	if _, ok := indexingProgress(errors.New("bad query")); ok {
+		t.Fatal("matched a plain error")
+	}
+	if got := indexingNotice(n); !strings.Contains(got, "120.0 万") {
+		t.Fatalf("notice %q", got)
 	}
 }

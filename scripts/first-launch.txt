@@ -20,5 +20,6 @@ Sift 0.1.0 · QSpace 的搜索伴侣
 
 Sift 常驻在菜单栏（放大镜图标），不占 Dock。
 
-推荐安装 fsearch 获得完整速度：https://github.com/noahdunnagan/fsearch
-没有安装时 Sift 会自动使用内置索引。
+搜索引擎 fsearch 已经内置，不用另外安装。第一次启动时它会为整块磁盘
+建立索引，大约半分钟。想搜到“邮件”“信息”等受保护的文件夹，在 Sift 的
+设置里点“打开‘完全磁盘访问权限’”，在列表中打开 Sift 即可。

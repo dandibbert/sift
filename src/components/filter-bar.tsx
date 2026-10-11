@@ -1,5 +1,7 @@
 import { Calendar, Check, ChevronDown, FolderTree, Layers, Ruler, X } from "lucide-react";
 import type { LucideIcon } from "lucide-react";
+import { useState } from "react";
+import { useOverlay } from "@/lib/overlay";
 import type { Filters } from "@/lib/api";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuLabel, DropdownMenuSeparator, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import { displayPath } from "@/lib/format";
@@ -67,9 +69,11 @@ function Chip({
   heading: string;
 }) {
   const active = value !== null;
+  const [open, setOpen] = useState(false);
+  useOverlay(open);
   return (
     <div className={cn("flex h-[26px] items-center rounded-full border text-[12px] transition-colors", active ? "border-foreground/12 bg-foreground/[0.07] text-foreground" : "border-border bg-transparent text-muted-foreground hover:bg-accent hover:text-foreground")}>
-      <DropdownMenu>
+      <DropdownMenu open={open} onOpenChange={setOpen}>
         <DropdownMenuTrigger className={cn("flex h-full items-center gap-1.5 rounded-full pl-2.5 outline-none focus-visible:ring-2 focus-visible:ring-ring", active ? "pr-1" : "pr-2")}>
           <Icon className="size-3.5 opacity-70" strokeWidth={1.8} />
           <span className="max-w-[140px] truncate">{value ?? label}</span>
