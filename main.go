@@ -105,10 +105,7 @@ func (p Panel) Resize(height int) {
 	if p.a.win == nil {
 		return
 	}
-	height = max(minPanelHeight, min(panelHeight, height))
-	if _, h := p.a.win.Size(); h != height {
-		p.a.win.SetSize(panelWidth, height)
-	}
+	p.a.win.SetSize(panelWidth, max(minPanelHeight, min(panelHeight, height)))
 }
 
 func (a *app) hide() {

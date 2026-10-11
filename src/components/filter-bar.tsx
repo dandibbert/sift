@@ -57,6 +57,7 @@ function Chip({
   filters,
   clear,
   onChange,
+  onClose,
   heading,
 }: {
   icon: LucideIcon;
@@ -66,6 +67,7 @@ function Chip({
   filters: Filters;
   clear: Partial<Filters>;
   onChange: (patch: Partial<Filters>) => void;
+  onClose: () => void;
   heading: string;
 }) {
   const active = value !== null;
@@ -73,7 +75,13 @@ function Chip({
   useOverlay(open);
   return (
     <div className={cn("flex h-[26px] items-center rounded-full border text-[12px] transition-colors", active ? "border-foreground/12 bg-foreground/[0.07] text-foreground" : "border-border bg-transparent text-muted-foreground hover:bg-accent hover:text-foreground")}>
-      <DropdownMenu open={open} onOpenChange={setOpen}>
+      <DropdownMenu
+        open={open}
+        onOpenChange={(o) => {
+          setOpen(o);
+          if (!o) onClose();
+        }}
+      >
         <DropdownMenuTrigger className={cn("flex h-full items-center gap-1.5 rounded-full pl-2.5 outline-none focus-visible:ring-2 focus-visible:ring-ring", active ? "pr-1" : "pr-2")}>
           <Icon className="size-3.5 opacity-70" strokeWidth={1.8} />
           <span className="max-w-[140px] truncate">{value ?? label}</span>
@@ -109,7 +117,7 @@ function Chip({
   );
 }
 
-export function FilterBar({ filters, home, onChange }: { filters: Filters; home: string; onChange: (patch: Partial<Filters>) => void }) {
+export function FilterBar({ filters, home, onChange, onClose }: { filters: Filters; home: string; onChange: (patch: Partial<Filters>) => void; onClose: () => void }) {
   const places = placeOptions(home);
   const pick = (opts: Option[]) => opts.find((o) => o.active(filters))?.label ?? null;
   const placeValue = filters.in ? (pick(places) ?? displayPath(filters.in, home)) : null;
@@ -117,10 +125,10 @@ export function FilterBar({ filters, home, onChange }: { filters: Filters; home:
 
   return (
     <div className="flex items-center gap-1.5 px-4 pb-2.5">
-      <Chip icon={Layers} label="类型" heading="只看" value={pick(typeOptions)} options={typeOptions} filters={filters} clear={{ type: "", kind: "" }} onChange={onChange} />
-      <Chip icon={Calendar} label="修改时间" heading="修改于" value={pick(timeOptions)} options={timeOptions} filters={filters} clear={{ modified: "" }} onChange={onChange} />
-      <Chip icon={Ruler} label="大小" heading="文件大小" value={pick(sizeOptions)} options={sizeOptions} filters={filters} clear={{ size: "" }} onChange={onChange} />
-      <Chip icon={FolderTree} label="位置" heading="搜索范围" value={placeValue} options={places} filters={filters} clear={{ in: "" }} onChange={onChange} />
+      <Chip icon={Layers} label="类型" heading="只看" value={pick(typeOptions)} options={typeOptions} filters={filters} clear={{ type: "", kind: "" }} onChange={onChange} onClose={onClose} />
+      <Chip icon={Calendar} label="修改时间" heading="修改于" value={pick(timeOptions)} options={timeOptions} filters={filters} clear={{ modified: "" }} onChange={onChange} onClose={onClose} />
+      <Chip icon={Ruler} label="大小" heading="文件大小" value={pick(sizeOptions)} options={sizeOptions} filters={filters} clear={{ size: "" }} onChange={onChange} onClose={onClose} />
+      <Chip icon={FolderTree} label="位置" heading="搜索范围" value={placeValue} options={places} filters={filters} clear={{ in: "" }} onChange={onChange} onClose={onClose} />
       {any && (
         <button type="button" onClick={() => onChange({ type: "", kind: "", modified: "", size: "", in: "" })} className="ml-auto rounded-md px-1.5 py-0.5 text-[12px] text-faint-foreground hover:text-foreground">
           全部清除

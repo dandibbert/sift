@@ -149,7 +149,8 @@ export function SearchPanel() {
       if (hit) setActionsOpen((o) => !o);
       return;
     }
-    if (actionsOpen) return;
+    // Menus render in portals, but React still bubbles their keys here.
+    if (actionsOpen || !e.currentTarget.contains(e.target as Node)) return;
     if (mod && e.key === ",") {
       e.preventDefault();
       setSettingsOpen(true);
@@ -296,6 +297,7 @@ export function SearchPanel() {
           setFilters((f) => ({ ...f, ...patch }));
           focusInput();
         }}
+        onClose={focusInput}
       />
 
       <div className={cn("relative h-px shrink-0", body ? "bg-border" : "-mt-px")}>

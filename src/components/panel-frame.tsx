@@ -17,6 +17,11 @@ export function PanelFrame({ className, maxHeight, children }: { className?: str
   const { menu, modal } = useOverlays();
   const expanded = menu || modal;
   const wasExpanded = useRef(false);
+  const latest = useRef(0);
+  latest.current = expanded ? PANEL_MAX : height;
+
+  // A resize sent while the window was hidden may not have stuck.
+  useEffect(() => api.onShown(() => latest.current && api.resize(latest.current)), []);
 
   useLayoutEffect(() => {
     const el = ref.current;

@@ -98,7 +98,7 @@ function EngineStatus({ status }: { status: Status | null }) {
         <CircleAlert className="mt-[3px] size-3.5 shrink-0 text-warn" />
         <span>
           {desktop
-            ? `${status.message || "fsearch 没能启动"}。暂时使用内置索引，只覆盖个人文件夹，Sift 会在后台自动重试。`
+            ? `${status.message.startsWith("fsearch 不可用") ? status.message : "fsearch 没能启动，正在使用内置索引"}，只覆盖个人文件夹。Sift 会在后台自动重试。`
             : "浏览器预览使用内置索引搜索示例文件夹；桌面版自带 fsearch，索引整块磁盘。"}
         </span>
       </div>
