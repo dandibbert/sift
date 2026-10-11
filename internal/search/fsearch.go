@@ -307,6 +307,22 @@ func indexingNotice(entries int) string {
 	return fmt.Sprintf("正在建立索引，已扫描 %.1f 万项，第一次启动需要半分钟左右", float64(entries)/1e4)
 }
 
+// Restart stops the daemon and starts a fresh one, which reads macOS
+// permissions again: fsearch checks for Full Disk Access only when it
+// starts.
+func (f *Fsearch) Restart(ctx context.Context) error {
+	if f.bin == "" {
+		return ErrNoFsearch
+	}
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	f.drop()
+	if err := stopDaemonAt(filepath.Dir(f.socket)); err != nil {
+		return err
+	}
+	return f.connect(ctx)
+}
+
 func (f *Fsearch) Close() error {
 	f.mu.Lock()
 	defer f.mu.Unlock()

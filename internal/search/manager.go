@@ -2,6 +2,7 @@ package search
 
 import (
 	"context"
+	"runtime"
 	"strings"
 	"sync"
 	"time"
@@ -19,6 +20,9 @@ type Manager struct {
 	builtin   *Builtin
 	lastTry   time.Time
 	lastError string
+	// fdaRestarted is set once the daemon was restarted to pick up Full
+	// Disk Access.
+	fdaRestarted bool
 }
 
 // NewManager connects to fsearch at socket, or indexes roots itself.
@@ -76,7 +80,25 @@ func isConnError(err error) bool {
 }
 
 func (m *Manager) Status(ctx context.Context) Status {
-	st := m.engine(ctx).Status(ctx)
+	e := m.engine(ctx)
+	st := e.Status(ctx)
+	if f, ok := e.(*Fsearch); ok && st.Ready && !st.FullDiskAccess && runtime.GOOS == "darwin" && HasFullDiskAccess() {
+		// Sift was granted Full Disk Access after the daemon started. A
+		// daemon Sift starts now inherits the grant, so start it over, once:
+		// a daemon run by launchd needs a grant of its own.
+		m.mu.Lock()
+		try := !m.fdaRestarted
+		m.fdaRestarted = true
+		m.mu.Unlock()
+		if try {
+			if err := f.Restart(ctx); err == nil {
+				st = f.Status(ctx)
+			}
+		}
+		if st.Ready && !st.FullDiskAccess {
+			st.Message = "Sift 已获得完全磁盘访问权限，但正在运行的 fsearch 不是 Sift 启动的（比如设成了随登录启动），需要在同一页里单独给它授权"
+		}
+	}
 	if st.Engine == "builtin" && m.lastError != "" && m.lastError != ErrNoFsearch.Error() {
 		st.Message = "fsearch 不可用（" + m.lastError + "），正在使用内置索引"
 	}
