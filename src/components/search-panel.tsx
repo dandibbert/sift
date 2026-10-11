@@ -100,10 +100,17 @@ export function SearchPanel() {
   useEffect(() => {
     if (settingsOpen) api.status().then(setStatus).catch(() => {});
   }, [settingsOpen]);
+  // Only while the window is in front: a hidden panel has nothing to show,
+  // and showing it again refreshes the status anyway.
   useEffect(() => {
     const fast = !status || !status.ready || awaitingAccess;
-    const t = setInterval(() => api.status().then(setStatus).catch(() => {}), fast ? 1500 : 20000);
-    return () => clearInterval(t);
+    const poll = () => document.hasFocus() && api.status().then(setStatus).catch(() => {});
+    const t = setInterval(poll, fast ? 1500 : 20000);
+    window.addEventListener("focus", poll);
+    return () => {
+      clearInterval(t);
+      window.removeEventListener("focus", poll);
+    };
   }, [status?.ready, awaitingAccess]);
 
   useEffect(() => setSelected(0), [result, searching, mode]);

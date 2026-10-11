@@ -159,19 +159,56 @@ func (f *Fsearch) call(ctx context.Context, req map[string]any, out any) error {
 			f.drop()
 			continue
 		}
-		var head struct {
-			OK    bool   `json:"ok"`
-			Error string `json:"error"`
-		}
-		if err = json.Unmarshal(resp, &head); err != nil {
-			return err
-		}
-		if !head.OK {
-			return errors.New(head.Error)
-		}
-		return json.Unmarshal(resp, out)
+		return decodeAnswer(resp, out)
 	}
 	return err
+}
+
+// once sends one request on a connection of its own and half-closes it.
+// The daemon spins a core for a moment after answering a client that stays
+// connected, betting on a next keystroke; that is worth it for queries but
+// not for status checks.
+func (f *Fsearch) once(ctx context.Context, req map[string]any, out any) error {
+	var d net.Dialer
+	c, err := d.DialContext(ctx, "unix", f.socket)
+	if err != nil {
+		return err
+	}
+	defer c.Close()
+	if dl, ok := ctx.Deadline(); ok {
+		c.SetDeadline(dl)
+	} else {
+		c.SetDeadline(time.Now().Add(5 * time.Second))
+	}
+	line, err := json.Marshal(req)
+	if err != nil {
+		return err
+	}
+	if _, err := c.Write(append(line, '\n')); err != nil {
+		return err
+	}
+	if uc, ok := c.(*net.UnixConn); ok {
+		uc.CloseWrite()
+	}
+	resp, err := bufio.NewReader(c).ReadBytes('\n')
+	if err != nil {
+		return err
+	}
+	return decodeAnswer(resp, out)
+}
+
+func decodeAnswer(resp []byte, out any) error {
+	var head struct {
+		OK    bool   `json:"ok"`
+		Error string `json:"error"`
+	}
+	if err := json.Unmarshal(resp, &head); err != nil {
+		return err
+	}
+	if !head.OK {
+		return errors.New(head.Error)
+	}
+	return json.Unmarshal(resp, out)
 }
 
 type fsHit struct {
@@ -264,19 +301,25 @@ func addFilters(msg map[string]any, f Filters) {
 }
 
 func (f *Fsearch) Status(ctx context.Context) Status {
+	st, _ := f.status(ctx)
+	return st
+}
+
+// status also returns the error that left the daemon unreachable, if any.
+func (f *Fsearch) status(ctx context.Context) (Status, error) {
 	var s struct {
 		Entries        int  `json:"entries"`
 		FullDiskAccess bool `json:"full_disk_access"`
 		ContentPending int  `json:"content_pending"`
 	}
 	st := Status{Engine: "fsearch"}
-	if err := f.call(ctx, map[string]any{"op": "status"}, &s); err != nil {
+	if err := f.once(ctx, map[string]any{"op": "status"}, &s); err != nil {
 		if n, ok := indexingProgress(err); ok {
 			st.Entries, st.FullDiskAccess, st.Message = n, true, indexingNotice(n)
-		} else {
-			st.Message = err.Error()
+			return st, nil
 		}
-		return st
+		st.Message = err.Error()
+		return st, err
 	}
 	st.Ready, st.Entries, st.FullDiskAccess = true, s.Entries, s.FullDiskAccess
 	if !s.FullDiskAccess {
@@ -284,7 +327,7 @@ func (f *Fsearch) Status(ctx context.Context) Status {
 	} else if s.ContentPending > 0 {
 		st.Message = fmt.Sprintf("内容索引中，剩余 %d 个文件", s.ContentPending)
 	}
-	return st
+	return st, nil
 }
 
 var indexingRe = regexp.MustCompile(`^indexing: ([0-9.]+)M entries`)

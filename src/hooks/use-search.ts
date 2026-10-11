@@ -29,8 +29,13 @@ export function useSearch(query: string, mode: "name" | "content", filters: Filt
   const indexing = state.result?.indexing ?? false;
   useEffect(() => {
     if (!indexing) return;
-    const t = setTimeout(() => setRetry((n) => n + 1), 1500);
-    return () => clearTimeout(t);
+    const again = () => setRetry((n) => n + 1);
+    const t = setTimeout(() => document.hasFocus() && again(), 1500);
+    window.addEventListener("focus", again);
+    return () => {
+      clearTimeout(t);
+      window.removeEventListener("focus", again);
+    };
   }, [indexing, state.result]);
 
   useEffect(() => {

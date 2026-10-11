@@ -81,7 +81,22 @@ func isConnError(err error) bool {
 
 func (m *Manager) Status(ctx context.Context) Status {
 	e := m.engine(ctx)
-	st := e.Status(ctx)
+	var st Status
+	if f, ok := e.(*Fsearch); ok {
+		var err error
+		if st, err = f.status(ctx); err != nil && isConnError(err) {
+			m.mu.Lock()
+			if m.fs == f {
+				f.Close()
+				m.fs, m.lastTry = nil, time.Time{}
+			}
+			m.mu.Unlock()
+			e = m.engine(ctx)
+			st = e.Status(ctx)
+		}
+	} else {
+		st = e.Status(ctx)
+	}
 	if f, ok := e.(*Fsearch); ok && st.Ready && !st.FullDiskAccess && runtime.GOOS == "darwin" && HasFullDiskAccess() {
 		// Sift was granted Full Disk Access after the daemon started. A
 		// daemon Sift starts now inherits the grant, so start it over, once:
