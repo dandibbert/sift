@@ -352,16 +352,26 @@ func indexingNotice(entries int) string {
 
 // Restart stops the daemon and starts a fresh one, which reads macOS
 // permissions again: fsearch checks for Full Disk Access only when it
-// starts.
-func (f *Fsearch) Restart(ctx context.Context) error {
+// starts. With rebuild, the saved index is dropped first: a daemon that
+// loads an index lacking the protected folders adds them one event at a
+// time, which takes far longer than a new parallel scan of the disk.
+func (f *Fsearch) Restart(ctx context.Context, rebuild bool) error {
 	if f.bin == "" {
 		return ErrNoFsearch
 	}
 	f.mu.Lock()
 	defer f.mu.Unlock()
 	f.drop()
-	if err := stopDaemonAt(filepath.Dir(f.socket)); err != nil {
+	dir := filepath.Dir(f.socket)
+	if err := stopDaemonAt(dir); err != nil {
 		return err
+	}
+	if rebuild {
+		for _, name := range []string{"index.bin", "skipped"} {
+			if err := os.Remove(filepath.Join(dir, name)); err != nil && !os.IsNotExist(err) {
+				return err
+			}
+		}
 	}
 	return f.connect(ctx)
 }

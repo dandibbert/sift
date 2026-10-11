@@ -106,7 +106,7 @@ func (m *Manager) Status(ctx context.Context) Status {
 		m.fdaRestarted = true
 		m.mu.Unlock()
 		if try {
-			if err := f.Restart(ctx); err == nil {
+			if err := f.Restart(ctx, true); err == nil {
 				st = f.Status(ctx)
 			}
 		}
