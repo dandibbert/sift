@@ -4,6 +4,18 @@ QSpace 的搜索伴侣。按下快捷键弹出一个轻量的浮动搜索窗口�
 
 Sift 只做搜索，不做文件浏览：它不替代 Finder 或 QSpace，也不依赖 QSpace 的扩展机制。
 
+## 下载安装
+
+1. 打开 `Sift-<版本>.dmg`，把 Sift 拖进“Applications”。（也可以用 zip 包，解压后拖进去。）
+2. 第一次打开时 macOS 会拦截，因为这个版本没有 Apple 开发者证书签名（只做了 ad-hoc 签名）。放行一次即可：
+   - 双击 Sift，看到提示后点“完成”，再到“系统设置 › 隐私与安全性”里点“仍要打开”；或者
+   - 在终端运行 `xattr -dr com.apple.quarantine /Applications/Sift.app`
+3. 按 `⌘⇧Space` 唤起。Sift 常驻在菜单栏，不占 Dock。
+
+支持 macOS 12 及以上，同一个包包含 Apple Silicon 和 Intel 两种架构。
+
+重新出包：`scripts/package-macos.sh`，产物在 `build/release/`。在 Linux 上打包需要 [rcodesign](https://github.com/indygreg/apple-platform-rs) 和 `genisoimage`。要彻底去掉首次打开的拦截，需要 Apple Developer ID 签名并公证，在 `mygo.config.ts` 的 `macos.signingIdentity` 和 `macos.notarize` 中配置后，在 Mac 上运行 `bun run build`。
+
 ## 功能
 
 - **全局快捷键唤起**：默认 `⌘⇧Space`，在任何应用里（包括 QSpace）都能用，可在设置中修改。失去焦点自动收起，常驻菜单栏，不占 Dock。

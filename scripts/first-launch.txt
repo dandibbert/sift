@@ -1,0 +1,24 @@
+Sift 0.1.0 · QSpace 的搜索伴侣
+
+安装：把 Sift 拖到右边的“Applications”文件夹。
+
+首次打开：
+这个版本没有 Apple 开发者证书签名，macOS 第一次会拦截。任选一种方式放行（只需一次）：
+
+  方式一：先双击打开 Sift，看到拦截提示后点“完成”，
+          然后打开“系统设置 › 隐私与安全性”，往下滚动，点“仍要打开”。
+
+  方式二：在“终端”里运行
+          xattr -dr com.apple.quarantine /Applications/Sift.app
+
+使用：
+  ⌘⇧Space  唤起搜索（可在设置 ⌘, 里修改）
+  ↵        在 QSpace 中显示
+  ⌘↵       打开
+  ⌘K       更多操作
+  Esc      收起
+
+Sift 常驻在菜单栏（放大镜图标），不占 Dock。
+
+推荐安装 fsearch 获得完整速度：https://github.com/noahdunnagan/fsearch
+没有安装时 Sift 会自动使用内置索引。
