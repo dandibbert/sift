@@ -25,6 +25,11 @@ var (
 func startDaemon(bin string) error {
 	cmd := exec.Command(bin, "serve")
 	cmd.SysProcAttr = &syscall.SysProcAttr{Setsid: true}
+	// Where `fsearch` itself sends a daemon's log, next to its socket.
+	if log, err := os.OpenFile(filepath.Join(filepath.Dir(DefaultSocket()), "daemon.log"), os.O_WRONLY|os.O_CREATE|os.O_APPEND, 0o644); err == nil {
+		defer log.Close()
+		cmd.Stdout, cmd.Stderr = log, log
+	}
 	if err := cmd.Start(); err != nil {
 		return err
 	}
